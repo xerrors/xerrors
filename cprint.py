@@ -2,23 +2,34 @@ import json
 from rich import print_json as print_json_rich
 
 def print_json(data):
+    if isinstance(data, str):
+        data = json.loads(data)
+
     print_json_rich(json.dumps(data, indent=4, ensure_ascii=False))
 
 
-def warning(prefix, msg):
-    print(yellow("[{}]".format(prefix), bold=True), msg)
+def warning(prefix, msg, wrap=False):
+    prefix = yellow("[{}]".format(prefix), bold=True)
+    msg = "\n" + msg if wrap else msg
+    print(prefix, msg)
 
 
-def error(prefix, msg):
-    print(red("[{}]".format(prefix), bold=True), msg)
+def error(prefix, msg, wrap=False):
+    prefix = red("[{}]".format(prefix), bold=True)
+    msg = "\n" + msg if wrap else msg
+    print(prefix, msg)
 
 
-def info(prefix, msg):
-    print(blue("[{}]".format(prefix), bold=True), msg)
+def info(prefix, msg, wrap=False):
+    prefix = blue("[{}]".format(prefix), bold=True)
+    msg = "\n" + msg if wrap else msg
+    print(prefix, msg)
 
 
-def success(prefix, msg):
-    print(green("[{}]".format(prefix), bold=True), msg)
+def success(prefix, msg, wrap=False):
+    prefix = green("[{}]".format(prefix), bold=True)
+    msg = "\n" + msg if wrap else msg
+    print(prefix, msg)
 
 
 def red(text, bold=False):

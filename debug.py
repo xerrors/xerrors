@@ -68,6 +68,7 @@ def plot_matrix(data, title=None, path=None, show=False, dpi=900):
         path = os.path.join("debug", clean_filename(title) + ".png")
 
     if path is None:
+        os.makedirs("debug", exist_ok=True)
         path = os.path.join("debug", "plot_matrix.png")
 
     fig.tight_layout()
