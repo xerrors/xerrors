@@ -8,25 +8,92 @@ def print_json(data):
     print_json_rich(json.dumps(data, indent=4, ensure_ascii=False))
 
 
-def warning(prefix, msg, wrap=False):
+# def warning(prefix, msg, wrap=False):
+#     prefix = yellow("[{}]".format(prefix), bold=True)
+#     msg = "\n" + msg if wrap else msg
+#     print(prefix, msg)
+
+
+# def error(prefix, msg, wrap=False):
+#     prefix = red("[{}]".format(prefix), bold=True)
+#     msg = "\n" + msg if wrap else msg
+#     print(prefix, msg)
+
+
+# def info(prefix, msg, wrap=False):
+#     prefix = blue("[{}]".format(prefix), bold=True)
+#     msg = "\n" + msg if wrap else msg
+#     print(prefix, msg)
+
+
+# def success(prefix, msg, wrap=False):
+#     prefix = green("[{}]".format(prefix), bold=True)
+#     msg = "\n" + msg if wrap else msg
+#     print(prefix, msg)
+
+def warning(prefix=None, msg=None, wrap=False):
+    """ When only one argument is provided, it will be treated as msg."""
+    if (prefix is None or msg is None) and wrap:
+        warning("XERRORS", "`wrap` will be set as `False`, cause `prefix` or `msg` is `None`")
+
+    if prefix is None and msg is None:
+        warning("EGG", "What's WRONG with U???")
+        return
+
+    if prefix is not None and msg is None and not wrap:
+        msg, prefix = prefix, msg
+    prefix = prefix or "WARNING"
     prefix = yellow("[{}]".format(prefix), bold=True)
     msg = "\n" + msg if wrap else msg
     print(prefix, msg)
 
 
-def error(prefix, msg, wrap=False):
+def error(prefix=None, msg=None, wrap=False):
+    """ When only one argument is provided, it will be treated as msg."""
+    if (prefix is None or msg is None) and wrap:
+        warning("XERRORS", "`wrap` will be set as `False`, cause `prefix` or `msg` is `None`")
+
+    if prefix is None and msg is None:
+        warning("EGG", "What's WRONG with U???")
+        return
+
+    if prefix is not None and msg is None and not wrap:
+        msg, prefix = prefix, msg
+    prefix = prefix or "ERROR  "
     prefix = red("[{}]".format(prefix), bold=True)
     msg = "\n" + msg if wrap else msg
     print(prefix, msg)
 
 
-def info(prefix, msg, wrap=False):
+def info(prefix=None, msg=None, wrap=False):
+    """ When only one argument is provided, it will be treated as msg."""
+    if (prefix is None or msg is None) and wrap:
+        warning("XERRORS", "`wrap` will be set as `False`, cause `prefix` or `msg` is `None`")
+
+    if prefix is None and msg is None:
+        warning("EGG", "What's WRONG with U???")
+        return
+
+    if prefix is not None and msg is None and not wrap:
+        msg, prefix = prefix, msg
+    prefix = prefix or "INFO   "
     prefix = blue("[{}]".format(prefix), bold=True)
     msg = "\n" + msg if wrap else msg
     print(prefix, msg)
 
 
-def success(prefix, msg, wrap=False):
+def success(prefix=None, msg=None, wrap=False):
+    """ When only one argument is provided, it will be treated as msg."""
+    if (prefix is None or msg is None) and wrap:
+        warning("XERRORS", "`wrap` will be set as `False`, cause `prefix` or `msg` is `None`")
+
+    if prefix is None and msg is None:
+        warning("EGG", "What's WRONG with U???")
+        return
+
+    if prefix is not None and msg is None and not wrap:
+        msg, prefix = prefix, msg
+    prefix = prefix or "SUCCESS"
     prefix = green("[{}]".format(prefix), bold=True)
     msg = "\n" + msg if wrap else msg
     print(prefix, msg)
