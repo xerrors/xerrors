@@ -91,3 +91,9 @@ def clean_filename(filename, replace=" ", char_limit=255):
     whitelist = "-_.() %s%s" % (string.ascii_letters, string.digits)
     cleaned_filename = "".join(c for c in cleaned_filename if c in whitelist)
     return cleaned_filename[:char_limit]
+
+
+from .cprint import error
+def log(condition, msg):
+    if condition:
+        error("DEBUG", msg)
