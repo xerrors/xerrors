@@ -21,7 +21,7 @@ class Runner(object):
 
         self.name = name
         self.run_id = run_id
-        self.configuation_index = configuation_index
+        self.configuation_index = self._parse_index(configuation_index)
         self.block_configuation = block_configuation
 
         self.args = runner_parser()
@@ -184,6 +184,13 @@ class Runner(object):
                     combination[key] = value
 
         return combinations
+
+    def _parse_index(self, index):
+        """ Parse the configuation index """
+        if isinstance(index, str):
+            with open(index, "r") as f:
+                index = yaml.load(f, Loader=yaml.FullLoader)
+        return index
 
     def refine_config(self, config):
         """ Refine the configuration """
