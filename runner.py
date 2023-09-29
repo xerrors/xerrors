@@ -15,24 +15,30 @@ from xerrors.metrics import confidence_interval
 class Runner(object):
     def __init__(self,
                  name="Runner",
-                 run_id=None,
                  configuation_index=None,
                  block_configuation=None,):
 
         self.name = name
-        self.run_id = run_id
         self.configuation_index = self._parse_index(configuation_index)
         self.block_configuation = block_configuation
+
+        self.global_gpu = None
 
         self.args = runner_parser()
         self.list = []
         self.runner_list = []
         self.test_list = []
 
+        # result
+        self.result = {}
+
         # skip
         self.skip_name_list = []
 
-    def run(self, func, sort_by_seed=False, **kwargs):
+    def run(self, func, sort_by_seed=False, run_id=None, gpu_id: str="", **kwargs):
+
+        run_id = run_id or f"RUN_{xerrors.cur_time()}"
+        gpu_id = gpu_id or self.modified_gpu()
 
         if self.args.test_mode:
             self.list = self.test_list
@@ -46,11 +52,11 @@ class Runner(object):
         if sort_by_seed:
             self.list = sorted(self.list, key=lambda x: x["seed"] if x.get("seed") else 0)
 
-        self.gpu = self.modified_gpu()
-
         print(cp.green(f"\nRunning {self.name} with {len(self.list)} configurations", bold=True))
         for config in self.list:
             config = self.refine_config(config)
+            config["run_id"] = run_id
+            config["gpu"] = gpu_id # 不使用 config 中指定的 gpu
             print(f" - {config['tag']}" + (f" (@{config['seed']})" if "seed" in config else ""))
 
         # 确认，开始运行，输入y确认，其余取消
@@ -71,6 +77,10 @@ class Runner(object):
             cp.print_json(result)
             results.append(result)
 
+        self.results = results
+        self._generate_results_table(results)
+
+    def _generate_results_table(self, results):
         # handle results
         keys = list(results[0].keys())
         keys.remove("tag")
@@ -95,13 +105,17 @@ class Runner(object):
 
         # print results
         table = PrettyTable()
+        result_json = {}
         table.field_names = list(keys)
         for tag, group in result_group.items():
             table.add_row([group[name] for name in keys])
+            result_json[tag] = {name: group[name] for name in keys}
 
         table.align["tag"] = "l"
         print(table)
-
+        self.results_table = table
+        self.result_json = result_json
+        # return table, result_group
 
     def execute(self, func, config, **kwargs):
         print("\n" + "=" * 80)
@@ -205,17 +219,20 @@ class Runner(object):
         else:
             config["tag"] = self.name
 
-        config["gpu"] = config.get("gpu") or self.gpu
         config["tag"] += generate_config_tag(config, self.configuation_index, self.block_configuation)
-        config["run_id"] = self.run_id if self.run_id else f"RUN_{xerrors.cur_time()}"
 
         return config
 
     def modified_gpu(self):
-        if self.args.gpu != "not specified":
-            return self.args.gpu
-        else:
-            return xerrors.get_gpu_by_user_input()
+        """ 全局 GPU 选择逻辑 """
+
+        if not self.global_gpu:
+            if self.args.gpu != "not specified":
+                self.global_gpu = self.args.gpu
+            else:
+                self.global_gpu = xerrors.get_gpu_by_user_input()
+
+        return self.global_gpu
 
 
 def generate_config_tag(config, configuation_index, block_configuation=None):
@@ -245,43 +262,3 @@ def runner_parser():
     parser.add_argument("--debug", action="store_true", help="Debug mode")
     args, _ = parser.parse_known_args()
     return args
-
-def demo_main():
-    print("demo_main")
-    return {
-        "loss": random.random(),
-        "acc": random.random(),
-    }
-
-if __name__ == "__main__":
-
-    configuation_index = {
-        "model": "M",
-        "dataset": "D",
-        "optimizer": "O-",
-    }
-
-    runner = Runner(
-        name="Runner",
-        run_id="RUN_2021-09-22_21-30-00",
-        configuation_index=configuation_index,
-    )
-
-    runner.add(
-        model=["resnet18", "resnet50"],
-        # dataset=["cifar10", "cifar100"],
-        optimizer=["sgd", "adam"],
-        seed=[1, 2, 3],
-    )
-
-    runner.add_test(
-        use_thres_val=True,
-        test_opt1=["last", "best"],
-        batch_size=1,
-        test_from_ckpt=["output/ouput-2023-09-20_03-14-22-Kirin-T-R1#start_pos-AttnL#2-MLPL#2", "output/ouput-2023-09-20_05-40-07-Kirin-T-R1#obj-AttnL#2-MLPL#2"],
-        # use_thres_threshold=[0.01, 0.001, 0.0005, 0.0001, 0.00001],
-        use_thres_threshold=[0.001, 0.0001],
-        offline=True,
-    )
-
-    runner.run(demo_main)
