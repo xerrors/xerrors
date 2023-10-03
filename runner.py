@@ -12,9 +12,14 @@ import xerrors
 import xerrors.cprint as cp
 from xerrors.metrics import confidence_interval
 
+## TODO
+# Resume from checkpoint
+
 class Runner(object):
     def __init__(self,
                  name="Runner",
+                 run_id=None,
+                 log_dir="output",
                  configuation_index=None,
                  block_configuation=None,):
 
@@ -32,12 +37,15 @@ class Runner(object):
         # result
         self.result = {}
 
+        self.run_id = run_id or f"RUN_{xerrors.cur_time()}"
+        self.run_dir = os.path.join(log_dir, f"{self.name}-{self.run_id}")
+        os.makedirs(self.run_dir, exist_ok=True)
+
         # skip
         self.skip_name_list = []
 
-    def run(self, func, sort_by_seed=False, run_id=None, gpu_id: str="", **kwargs):
+    def run(self, func, sort_by_seed=False, gpu_id: str="", **kwargs):
 
-        run_id = run_id or f"RUN_{xerrors.cur_time()}"
         gpu_id = gpu_id or self.modified_gpu()
 
         if self.args.test_mode:
@@ -55,7 +63,7 @@ class Runner(object):
         print(cp.green(f"\nRunning {self.name} with {len(self.list)} configurations", bold=True))
         for config in self.list:
             config = self.refine_config(config)
-            config["run_id"] = run_id
+            config["run_id"] = self.run_id
             config["gpu"] = gpu_id # 不使用 config 中指定的 gpu
             print(f" - {config['tag']}" + (f" (@{config['seed']})" if "seed" in config else ""))
 
