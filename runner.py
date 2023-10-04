@@ -60,12 +60,24 @@ class Runner(object):
         if sort_by_seed:
             self.list = sorted(self.list, key=lambda x: x["seed"] if x.get("seed") else 0)
 
+        special_content = {
+            "seed": lambda k,v: f" @{v}",
+            "dataset_config": lambda k,v: f" Data:{v.split('/')[-1].split('.')[0]}",
+            "gpu": lambda k,v: f" #{v}",
+        }
+
         print(cp.green(f"\nRunning {self.name} with {len(self.list)} configurations", bold=True))
         for config in self.list:
             config = self.refine_config(config)
             config["run_id"] = self.run_id
             config["gpu"] = gpu_id # 不使用 config 中指定的 gpu
-            print(f" - {config['tag']}" + (f" (@{config['seed']})" if "seed" in config else ""))
+
+            show_name = config["tag"]
+            for k, v in config.items():
+                if k in special_content:
+                    show_name += special_content[k](k, v)
+            # print(f" - {config['tag']}" + (f" (@{config['seed']})" if "seed" in config else ""))
+            print(f" - {show_name}")
 
         # 确认，开始运行，输入y确认，其余取消
         if not self.args.debug and not self.args.Y:
