@@ -44,7 +44,7 @@ class Runner(object):
         # Temp
         self.special_content = {
             "seed": lambda k,v: f"-SEED@{v}",
-            "dataset_config": lambda k,v: f"-D#{v.split('/')[-1].split('.')[0][-1:]}",
+            "dataset_config": lambda k,v: f"-D{v.split('/')[-1].split('.')[0][-1:]}",
             "gpu": lambda k,v: f"-GPU#{v}",
         }
 
@@ -88,8 +88,12 @@ class Runner(object):
                 exit()
 
         results = []
-        for config in self.list:
-            result, status = self.execute(func, config, **kwargs)
+        for ci, config in enumerate(self.list):
+            # 定义了 start_index，用于继续运行之前断开的任务
+            if kwargs.get("start_index") and ci < kwargs["start_index"]:
+                continue
+
+            result, status = self.execute(func, ci, config, **kwargs)
 
             if status != "done":
                 continue
@@ -138,9 +142,9 @@ class Runner(object):
         self.result_json = result_json
         # return table, result_group
 
-    def execute(self, func, config, **kwargs):
+    def execute(self, func, ci, config, **kwargs):
         print("\n" + "=" * 80)
-        print(f"{xerrors.cur_time('human')} Runing: {cp.magenta(config['tag'], bold=True)}")
+        print(f"{xerrors.cur_time('human')} Runing: {ci}/{len(self.list)} {cp.magenta(config['tag'], bold=True)}")
         print("=" * 80)
         print(config["tag"] + " Config:", end=" ")
         cp.print_json(config)
