@@ -44,7 +44,7 @@ class Runner(object):
         # Temp
         self.special_content = {
             "seed": lambda k,v: f"-SEED@{v}",
-            "dataset_config": lambda k,v: f"-Data#{v.split('/')[-1].split('.')[0][-2:]}",
+            "dataset_config": lambda k,v: f"-D#{v.split('/')[-1].split('.')[0][-1:]}",
             "gpu": lambda k,v: f"-GPU#{v}",
         }
 
