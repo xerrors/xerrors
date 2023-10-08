@@ -68,7 +68,7 @@ class Runner(object):
             self.list = sorted(self.list, key=lambda x: x["seed"] if x.get("seed") else 0)
 
         print(cp.green(f"\nRunning {self.name} with {len(self.list)} configurations", bold=True))
-        for config in self.list:
+        for ci, config in enumerate(self.list):
             config = self.refine_config(config)
             config["run_id"] = self.run_id
             config["gpu"] = gpu_id # 不使用 config 中指定的 gpu
@@ -78,7 +78,9 @@ class Runner(object):
                 if k in self.special_content and k in self.block_configuation:
                     show_name += self.special_content[k](k, v)
             # print(f" - {config['tag']}" + (f" (@{config['seed']})" if "seed" in config else ""))
-            print(f" - {config['tag']} ({show_name})")
+            
+            show_name += "  ◀" if kwargs.get("start_index", 0) == ci else ""
+            print(f" - {config['tag']} | {show_name}")
 
         # 确认，开始运行，输入y确认，其余取消
         if not self.args.debug and not self.args.Y:
