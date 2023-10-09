@@ -5,6 +5,7 @@ import random
 import argparse
 from collections import defaultdict
 from prettytable import PrettyTable
+from scipy.__config__ import show
 
 import yaml
 import traceback
@@ -43,9 +44,9 @@ class Runner(object):
 
         # Temp
         self.special_content = {
-            "seed": lambda k,v: f"-SEED@{v}",
+            "seed": lambda k,v: f" SEED@{v}",
             "dataset_config": lambda k,v: f"-D{v.split('/')[-1].split('.')[0][-1:]}",
-            "gpu": lambda k,v: f"-GPU#{v}",
+            "gpu": lambda k,v: f" GPU#{v}",
         }
 
         # skip
@@ -67,7 +68,9 @@ class Runner(object):
         if sort_by_seed:
             self.list = sorted(self.list, key=lambda x: x["seed"] if x.get("seed") else 0)
 
-        print(cp.green(f"\nRunning {self.name} with {len(self.list)} configurations", bold=True))
+
+        print(cp.yellow(f"\nRunning {self.name} with {len(self.list)} configurations", bold=True))
+        infos = []
         for ci, config in enumerate(self.list):
             config = self.refine_config(config)
             config["run_id"] = self.run_id
@@ -79,8 +82,11 @@ class Runner(object):
                     show_name += self.special_content[k](k, v)
             # print(f" - {config['tag']}" + (f" (@{config['seed']})" if "seed" in config else ""))
             
-            show_name += "  ◀" if kwargs.get("start_index", 0) == ci else ""
-            print(f" - {config['tag']} | {show_name}")
+            prefix_tag = cp.green("▶") if ci == kwargs.get("start_index", 0) else "-"
+            tag_name = cp.green(config['tag'], bold=True) if ci == kwargs.get("start_index", 0) else config['tag']
+            infos.append(f" {prefix_tag} {tag_name}|T|{show_name}")
+
+        print("\n".join(align_strings(infos)))
 
         # 确认，开始运行，输入y确认，其余取消
         if not self.args.debug and not self.args.Y:
@@ -293,3 +299,29 @@ def runner_parser():
     parser.add_argument("--debug", action="store_true", help="Debug mode")
     args, _ = parser.parse_known_args()
     return args
+
+
+def visible_length(text):
+    # 使用正则表达式去除ANSI转义序列
+    import re
+    ansi_escape = re.compile(r"\033\[\d+;\d+m|\033\[\d+m")
+    # visible_text = ansi_escape.sub('', text)
+    visible_text = re.sub(ansi_escape, '', text)
+    return len(visible_text)
+
+def align_strings(input_list, split_str="|T|"):
+    # 找到最长的可见字符串长度
+    max_visible_length = max(visible_length(s.replace(split_str, '')) for s in input_list)
+    # 对每个字符串进行处理，使其长度一样，并以|T|为分隔对齐
+    aligned_list = []
+    for s in input_list:
+        if split_str in s:
+            parts = s.split(split_str)
+            left_part = parts[0].ljust(max_visible_length - visible_length(parts[1]), " ")
+            right_part = parts[1].rjust(visible_length(parts[1]), " ")
+            aligned_string = left_part + "" + right_part
+        else:
+            aligned_string = s.ljust(max_visible_length + 1, " ")
+        aligned_list.append(aligned_string)
+    
+    return aligned_list
