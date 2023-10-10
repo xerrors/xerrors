@@ -82,7 +82,7 @@ class Runner(object):
                     show_name += self.special_content[k](k, v)
             # print(f" - {config['tag']}" + (f" (@{config['seed']})" if "seed" in config else ""))
 
-            prefix_tag = cp.green("▶") if ci == kwargs.get("start_index", 0) else "-"
+            prefix_tag = cp.green("▶") if ci == kwargs.get("start_index", 0) else ci
             tag_name = cp.green(config['tag'], bold=True) if ci == kwargs.get("start_index", 0) else config['tag']
             infos.append(f" {prefix_tag} {tag_name}|T|{show_name}")
 
@@ -90,10 +90,12 @@ class Runner(object):
 
         # 确认，开始运行，输入y确认，其余取消
         if not self.args.debug and not self.args.Y:
-            option = input("Confirm to run? ([y]/n): ")
-            if option != "y" and option != "Y" and option != "":
+            option = input("Confirm to run ([y]/n)?: ")
+            if option not in ["y", "Y", ""] + [str(i) for i in range(len(self.list))]:
                 cp.error(self.name, "Canceled!")
                 exit()
+            elif option in [str(i) for i in range(len(self.list))]:
+                kwargs["start_index"] = int(option)
 
         results = []
         for ci, config in enumerate(self.list):

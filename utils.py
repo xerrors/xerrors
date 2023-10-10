@@ -35,9 +35,9 @@ def get_gpu_by_user_input():
     except:
         print("WARNING: Try to install gpustat to check GPU status: pip install gpustat")
 
-    gpu = input("\nSelect GPU >>> ")
+    gpu = input("\nSelect GPU [0]: ") or "0"
 
-    assert gpu and int(gpu) in [0, 1, 2, 3], \
-        "Can not run scripts on GPU: {}. Stoped!".format(gpu if gpu else "None")
+    assert gpu in ["0", "1", "2", "3", "4", "5", "6", "7"], \
+        "Can not run scripts on GPU: {}".format(gpu if gpu else "None")
     print("This scripts will use GPU {}".format(gpu))
     return gpu
