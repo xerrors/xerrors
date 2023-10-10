@@ -129,7 +129,7 @@ class Runner(object):
             for name in keys:
                 if isinstance(group["results"][0].get(name, "N/A"), (int, float)):
                     mean, h = confidence_interval([r[name] for r in group["results"]])
-                    group[name] = f"{mean*100:.1f}±{h:.1f}"
+                    group[name] = f"{mean*100:.1f}±{h*100:.1f}"
                 else:
                     group[name] = group["results"][0].get(name, "N/A")
                     if len(group["results"]) > 1:

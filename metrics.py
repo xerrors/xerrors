@@ -4,11 +4,11 @@ import scipy
 # 计算置信区间的函数
 def confidence_interval(data, confidence=0.95):
     """计算置信区间
-    
+
     Args:
         data (list): 数据
         confidence (float, optional): 置信度. Defaults to 0.95.
-        
+
     Returns:
         mean (float): 均值
         h (float): 置信区间
