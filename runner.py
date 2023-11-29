@@ -12,6 +12,7 @@ import traceback
 import xerrors
 import xerrors.cprint as cp
 from xerrors.metrics import confidence_interval
+from xerrors.utils import print_disk_space
 
 ## TODO
 # Resume from checkpoint
@@ -22,7 +23,8 @@ class Runner(object):
                  run_id=None,
                  log_dir="output",
                  configuation_index=None,
-                 block_configuation=None,):
+                 block_configuation=None,
+                 **kwargs):
 
         self.name = name
         self.configuation_index = self._parse_index(configuation_index)
@@ -30,7 +32,7 @@ class Runner(object):
 
         self.global_gpu = None
 
-        self.args = runner_parser()
+        self.args = self.runner_parser(kwargs.get("extend_args"))
         self.list = []
         self.runner_list = []
         self.test_list = []
@@ -52,71 +54,125 @@ class Runner(object):
         # skip
         self.skip_name_list = []
 
-    def run(self, func, sort_by_seed=False, gpu_id: str="", **kwargs):
+    def run(self, func,
+            gpu_id: str="",
+            before_run_hook: callable=None,
+            main_index: str=None,
+            **kwargs):
 
         gpu_id = gpu_id or self.modified_gpu()
+        start_index = kwargs.get("start_index", 0)
+        use_top_config = kwargs.get("use_top_config")
 
+        self.list = self.runner_list
         if self.args.test_mode:
             self.list = self.test_list
-        else:
-            self.list = self.runner_list
 
-        if len(self.list) == 0:
+        if before_run_hook:
+            self.list = before_run_hook(self.list, gpu_id=gpu_id)
+
+        job_list_count = len(self.list)
+        if job_list_count == 0:
             cp.warning(self.name, "No configurations found")
             return
 
-        if sort_by_seed:
-            self.list = sorted(self.list, key=lambda x: x["seed"] if x.get("seed") else 0)
+        print_disk_space()
 
-
-        print(cp.yellow(f"\nRunning {self.name} with {len(self.list)} configurations", bold=True))
         infos = []
+        print(cp.yellow(f"\nRunning {self.name} with {job_list_count} configurations", bold=True))
         for ci, config in enumerate(self.list):
             config = self.refine_config(config)
+            config["cid"] = ci
             config["run_id"] = self.run_id
             config["gpu"] = gpu_id # 不使用 config 中指定的 gpu
 
-            show_name = ""
-            for k, v in config.items():
-                if k in self.special_content and k in self.block_configuation:
-                    show_name += self.special_content[k](k, v)
-            # print(f" - {config['tag']}" + (f" (@{config['seed']})" if "seed" in config else ""))
+            show_name = self.get_show_name(config)
 
-            prefix_tag = cp.green("▶") if ci == kwargs.get("start_index", 0) else ci
-            tag_name = cp.green(config['tag'], bold=True) if ci == kwargs.get("start_index", 0) else config['tag']
+            prefix_tag = cp.green("▶") if ci == start_index else ci
+            tag_name = cp.green(config['tag'], bold=True) if ci == start_index else config['tag']
             infos.append(f" {prefix_tag} {tag_name}|T|{show_name}")
 
         print("\n".join(align_strings(infos)))
 
         # 确认，开始运行，输入y确认，其余取消
         if not self.args.debug and not self.args.Y:
-            option = input("Confirm to run ([y]/n)?: ")
-            if option not in ["y", "Y", ""] + [str(i) for i in range(len(self.list))]:
-                cp.error(self.name, "Canceled!")
-                exit()
-            elif option in [str(i) for i in range(len(self.list))]:
-                kwargs["start_index"] = int(option)
+            prompt = "Confirm to run ([y]/n)?: "
+            if kwargs.get("skip_value"):
+                prompt = f"Confirm to run with skip value {cp.yellow(kwargs.get('skip_value'), True)} ([y]/n)?: "
+
+            option = input(prompt)
+
+            try:
+                option = float(option)
+                assert option >= 0 and option < 1, "Wrong option!"
+                kwargs["skip_value"] = option
+                print(f"Skip value set to {cp.yellow(option, True)}")
+            except:
+                assert option in ["y", "Y", ""] + [str(i) for i in range(job_list_count)], "Canceled!"
+                if option in [str(i) for i in range(job_list_count)]:
+                    start_index = int(option)
 
         results = []
-        for ci, config in enumerate(self.list):
-            # 定义了 start_index，用于继续运行之前断开的任务
-            if kwargs.get("start_index") and ci < kwargs["start_index"]:
-                continue
 
-            result, status = self.execute(func, ci, config, **kwargs)
+        if use_top_config:
+            avg_result = defaultdict(list)
+            mean = lambda ll: sum(ll) / len(ll) if len(ll) > 0 else 0
+            tag_num = len(set([c["tag"] for c in self.list]))
+
+            assert start_index == 0, "use_top_config and start_index cannot be used together"
+            # assert job_list_count % tag_num == 0, "job_list_count % tag_num != 0"
+
+        for ci in range(job_list_count):
+            if use_top_config:
+                if len(avg_result.keys()) == tag_num:
+                    config = None
+                    i = 0
+                    avg_sorted_tags = sorted(avg_result.keys(), key=lambda k: mean(avg_result[k]), reverse=True)
+                    while not config and i < len(avg_sorted_tags):
+                        for ccc in self.list:
+                            if not ccc.get("status") and ccc["tag"] == avg_sorted_tags[i]:
+                                config = ccc
+                                break
+                        i += 1
+                else:
+                    for cci in range(job_list_count):
+                        if not self.list[cci].get("status") and self.list[cci]["tag"] not in avg_result.keys():
+                            config = self.list[cci]
+                            break
+
+                assert config, "No config found!"
+
+            else:
+                config = self.list[ci]
+                if start_index and ci < start_index:
+                    continue
+
+            if len(avg_result) > 0:
+                print([f"{k}: {mean(avg_result[k]):.4f}" for k in avg_result.keys()], f"select {config['tag']} {avg_result[config['tag']]}")
+
+            result, status = self.execute(func, ci, config, main_index=main_index, **kwargs)
+            config["status"] = status
 
             if status != "done":
                 continue
 
-            print(result["tag"] + " Result:", end=" ")
+            print(self.run_id + " Result:", end=" ")
             cp.print_json(result)
             results.append(result)
+
+            if use_top_config:
+                avg_result[config["tag"]].append(result.get(main_index, 0))
 
         self.results = results
         self._generate_results_table(results)
 
     def _generate_results_table(self, results):
         # handle results
+        if len(results) == 0:
+            self.results_table = None
+            self.result_json = {"name": "Result is None."}
+            return
+
         keys = list(results[0].keys())
         keys.remove("tag")
         keys.insert(0, "tag") # tag should be the first column
@@ -153,44 +209,48 @@ class Runner(object):
         print(table)
         self.results_table = table
         self.result_json = result_json
+        with open(os.path.join(self.run_dir, "result.json"), "w") as f:
+            yaml.dump({str(self.run_id): results}, f, sort_keys=False)
+        with open(os.path.join(self.run_dir, "result_table.txt"), "w") as f:
+            f.write(str(table))
+        with open(os.path.join(self.run_dir, "result_parsed.json"), "w") as f:
+            yaml.dump(result_json, f, sort_keys=False)
         # return table, result_group
 
     def execute(self, func, ci, config, **kwargs):
         print("\n" + "=" * 80)
-        print(f"{xerrors.cur_time('human')} Runing: {ci}/{len(self.list)} {cp.magenta(config['tag'], bold=True)}")
+        print(f"{xerrors.cur_time('human')} Runing: {ci}/{len(self.list)} {cp.magenta(config['tag'], bold=True)} {self.get_show_name(config)}")
         print("=" * 80)
-        print(config["tag"] + " Config:", end=" ")
-        cp.print_json(config)
+        # print(config["tag"] + " Config:", end=" ")
+        # cp.print_json(config)
 
         result = {}
         status = "start"
 
         if config["tag"] in self.skip_name_list:
-            print(config["tag"], f"Skip! {config['tag']} in skip_name_list")
+            print(f"{cp.red('Skip!', bold=True)} {config['tag']} in skip_name_list: {', '.join(self.skip_name_list)}")
             status = "skip"
             return result, status
 
         try:
             result = func(True, **config)
             result["tag"] = config["tag"]
-            print(config["tag"], "Done!")
             status = "done"
 
             # 处理跳过逻辑的代码
-            skip_index = kwargs.get("skip_index")
+            main_index = kwargs.get("main_index")
             skip_value = kwargs.get("skip_value")
-            if skip_index and skip_value:
-                if result.get(skip_index) and result[skip_index] < skip_value:
+            if main_index and skip_value:
+                if result.get(main_index) and result[main_index] < skip_value:
                     self.skip_name_list.append(config["tag"])
-                    print(config["tag"], f"{cp.red('Skip!')} {skip_index}={result[skip_index]} < {skip_value}")
-                    status = "skip"
+                    print(config["tag"], f"{main_index}={result[main_index]} < {skip_value}")
+                    print(f"The following config will be skipped: {', '.join(self.skip_name_list)}")
 
 
         except KeyboardInterrupt:
             cp.error(self.name, "KeyboardInterrupt: Interrupted by user!")
             status = "interrupted"
             try:
-                # time.sleep(3)
                 print("10 秒后继续运行", end="")
                 for i in range(10, 0, -1):
                     time.sleep(1)
@@ -295,15 +355,27 @@ class Runner(object):
 
         return tag
 
-def runner_parser():
-    parser = argparse.ArgumentParser(add_help=False)
-    parser.add_argument("-Y", action="store_true", help="Confirm to run")
-    parser.add_argument("-T", "--test-mode", action="store_true", help="Run Test")
-    parser.add_argument("--gpu", type=str, default="not specified")
-    parser.add_argument("--output", type=str, default="output", help="Output directory")
-    parser.add_argument("--debug", action="store_true", help="Debug mode")
-    args, _ = parser.parse_known_args()
-    return args
+    def runner_parser(self, extend_args=[]):
+        parser = argparse.ArgumentParser(add_help=False)
+        parser.add_argument("-Y", action="store_true", help="Confirm to run")
+        parser.add_argument("-T", "--test-mode", action="store_true", help="Run Test")
+        parser.add_argument("--gpu", type=str, default="not specified")
+        parser.add_argument("--output", type=str, default="output", help="Output directory")
+        parser.add_argument("--debug", action="store_true", help="Debug mode")
+
+        # if extend_args is not None and len(extend_args) > 0:
+        #     for arg in extend_args:
+        #         parser.add_argument(**arg)
+
+        args, _ = parser.parse_known_args()
+        return args
+
+    def get_show_name(self, config):
+        show_name = ""
+        for k, v in config.items():
+            if k in self.special_content and k in self.block_configuation:
+                show_name += self.special_content[k](k, v)
+        return show_name
 
 
 def visible_length(text):
