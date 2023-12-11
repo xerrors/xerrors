@@ -85,6 +85,7 @@ class Runner(object):
             config["cid"] = ci
             config["run_id"] = self.run_id
             config["gpu"] = gpu_id # 不使用 config 中指定的 gpu
+            config["output"] = self.args.output
 
             show_name = self.get_show_name(config)
 
