@@ -149,7 +149,13 @@ class Runner(object):
                     continue
 
             if len(avg_result) > 0:
-                print([f"{k}: {mean(avg_result[k]):.4f}" for k in avg_result.keys()], f"select {config['tag']} {avg_result[config['tag']]}")
+                print()
+                for k in avg_result.keys():
+                    fmt_result = ", ".join([f"{r:.4f}" for r in avg_result[k]])
+                    ppname = cp.green(f"▶ {k}", True) if k == config['tag'] else cp.blue(f"  {k}")
+                    print(ppname, f"\t{mean(avg_result[k]):.4f} ({len(avg_result[k])}): {fmt_result}", )
+                
+                # print(f"select {config['tag']} {', '.join([f'{r:.4f}' for r in avg_result[k]])}")
 
             result, status = self.execute(func, ci, config, main_index=main_index, **kwargs)
             config["status"] = status
@@ -196,7 +202,7 @@ class Runner(object):
                         group[name] += f" ({len(group['results'])})"
 
         cur_time = xerrors.cur_time("human")
-        cp.success(self.name, "All Done! " + cur_time)
+        cp.success(self.name, "All Done! " + cur_time + f" Run ID: {self.run_id}")
 
         # print results
         table = PrettyTable()
