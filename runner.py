@@ -1,4 +1,3 @@
-
 import os
 import time
 import random
@@ -14,25 +13,41 @@ import xerrors.cprint as cp
 from xerrors.metrics import confidence_interval
 from xerrors.utils import print_disk_space
 
-## TODO
+
+# TODO
 # Resume from checkpoint
+
+
+def runner_parser():
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("-Y", action="store_true", help="Confirm to run")
+    parser.add_argument("-T", "--test-mode", action="store_true", help="Run Test")
+    parser.add_argument("--gpu", type=str, default="not specified")
+    parser.add_argument("--output", type=str, default="output", help="Output directory")
+    parser.add_argument("--debug", action="store_true", help="Debug mode")
+    parser.add_argument("--offline", action="store_true", help="Wandb offline")
+
+    args, _ = parser.parse_known_args()
+    return args
+
 
 class Runner(object):
     def __init__(self,
                  name="Runner",
                  run_id=None,
                  log_dir="output",
-                 configuation_index=None,
-                 block_configuation=None,
+                 configuration_index=None,
+                 block_configuration=None,
                  **kwargs):
 
+        self.results = None
         self.name = name
-        self.configuation_index = self._parse_index(configuation_index)
-        self.block_configuation = block_configuation
+        self.configuration_index = self._parse_index(configuration_index)
+        self.block_configuration = block_configuration
 
         self.global_gpu = None
 
-        self.args = self.runner_parser(kwargs.get("extend_args"))
+        self.args = runner_parser()
         self.list = []
         self.runner_list = []
         self.test_list = []
@@ -40,36 +55,38 @@ class Runner(object):
         # result
         self.result = {}
 
-        self.run_id = run_id or f"RUN_{xerrors.cur_time()}"
-        self.run_dir = os.path.join(log_dir, f"{self.name}-{self.run_id}")
+        # config dirs
+        timer = xerrors.cur_time()
+        self.run_id = run_id or f"RUN_{timer}"
+        self.run_dir = os.path.join(log_dir, "runner", f"{timer.year}-{timer.mon}", f"{self.name}-{self.run_id}")
         os.makedirs(self.run_dir, exist_ok=True)
 
         # Temp
         self.special_content = {
-            "seed": lambda k,v: f" SEED@{v}",
-            "dataset_config": lambda k,v: f"-D{v.split('/')[-1].split('.')[0][-1:]}",
-            "gpu": lambda k,v: f" GPU#{v}",
+            "seed": lambda k, v: f" SEED@{v}",
+            "dataset_config": lambda k, v: f"-D{v.split('/')[-1].split('.')[0][-1:]}",
+            "gpu": lambda k, v: f" GPU#{v}",
         }
 
         # skip
         self.skip_name_list = []
 
     def run(self, func,
-            gpu_id: str="",
-            before_run_hook: callable=None,
-            main_index: str=None,
+            gpu_id: str = "",
+            before_train_hook: callable = None,
+            main_index: str = None,
             **kwargs):
 
         gpu_id = gpu_id or self.modified_gpu()
         start_index = kwargs.get("start_index", 0)
         use_top_config = kwargs.get("use_top_config")
 
-        self.list = self.runner_list
         if self.args.test_mode:
             self.list = self.test_list
-
-        if before_run_hook:
-            self.list = before_run_hook(self.list, gpu_id=gpu_id)
+        else:
+            self.list = self.runner_list
+            if before_train_hook:
+                self.list = before_train_hook(self, self.list, gpu_id=gpu_id)
 
         job_list_count = len(self.list)
         if job_list_count == 0:
@@ -84,8 +101,10 @@ class Runner(object):
             config = self.refine_config(config)
             config["cid"] = ci
             config["run_id"] = self.run_id
-            config["gpu"] = gpu_id # 不使用 config 中指定的 gpu
+            config["gpu"] = gpu_id  # 不使用 config 中指定的 gpu
             config["output"] = self.args.output
+            config["debug"] = self.args.debug
+            config["offline"] = self.args.offline
 
             show_name = self.get_show_name(config)
 
@@ -105,24 +124,25 @@ class Runner(object):
 
             try:
                 option = float(option)
-                assert option >= 0 and option < 1, "Wrong option!"
+                assert 0 <= option < 1, "Wrong option!"
                 kwargs["skip_value"] = option
                 print(f"Skip value set to {cp.yellow(option, True)}")
-            except:
+            except (ValueError, AssertionError):
                 assert option in ["y", "Y", ""] + [str(i) for i in range(job_list_count)], "Canceled!"
                 if option in [str(i) for i in range(job_list_count)]:
                     start_index = int(option)
 
         results = []
 
+        avg_result = defaultdict(list)
         if use_top_config:
-            avg_result = defaultdict(list)
             mean = lambda ll: sum(ll) / len(ll) if len(ll) > 0 else 0
             tag_num = len(set([c["tag"] for c in self.list]))
 
             assert start_index == 0, "use_top_config and start_index cannot be used together"
             # assert job_list_count % tag_num == 0, "job_list_count % tag_num != 0"
 
+        config = None
         for ci in range(job_list_count):
             if use_top_config:
                 if len(avg_result.keys()) == tag_num:
@@ -154,7 +174,7 @@ class Runner(object):
                     fmt_result = ", ".join([f"{r:.4f}" for r in avg_result[k]])
                     ppname = cp.green(f"▶ {k}", True) if k == config['tag'] else cp.blue(f"  {k}")
                     print(ppname, f"\t{mean(avg_result[k]):.4f} ({len(avg_result[k])}): {fmt_result}", )
-                
+
                 # print(f"select {config['tag']} {', '.join([f'{r:.4f}' for r in avg_result[k]])}")
 
             result, status = self.execute(func, ci, config, main_index=main_index, **kwargs)
@@ -182,7 +202,7 @@ class Runner(object):
 
         keys = list(results[0].keys())
         keys.remove("tag")
-        keys.insert(0, "tag") # tag should be the first column
+        keys.insert(0, "tag")  # tag should be the first column
         result_group = defaultdict(dict)
         for result in results:
             result_group[result["tag"]] = result_group.get(result["tag"], defaultdict(list))
@@ -193,16 +213,16 @@ class Runner(object):
                 if isinstance(group["results"][0].get(name, "N/A"), (int, float)):
                     if len(group["results"]) > 1:
                         mean, h = confidence_interval([r[name] for r in group["results"]])
-                        group[name] = f"{mean*100:.1f}±{h*100:.1f}"
+                        group[name] = f"{mean * 100:.1f}±{h * 100:.1f}"
                     else:
-                        group[name] = f"{group['results'][0][name]*100:.1f}"
+                        group[name] = f"{group['results'][0][name] * 100:.1f}"
                 else:
                     group[name] = group["results"][0].get(name, "N/A")
                     if len(group["results"]) > 1:
                         group[name] += f" ({len(group['results'])})"
 
         cur_time = xerrors.cur_time("human")
-        cp.success(self.name, "All Done! " + cur_time + f" Run ID: {self.run_id}")
+        cp.success(self.name, "All Done! " + str(cur_time) + f" Run ID: {self.run_id}")
 
         # print results
         table = PrettyTable()
@@ -216,18 +236,22 @@ class Runner(object):
         print(table)
         self.results_table = table
         self.result_json = result_json
-        with open(os.path.join(self.run_dir, "result.json"), "w") as f:
+        with open(os.path.join(self.run_dir, "result.yaml"), "w") as f:
             yaml.dump({str(self.run_id): results}, f, sort_keys=False)
         with open(os.path.join(self.run_dir, "result_table.txt"), "w") as f:
             f.write(str(table))
-        with open(os.path.join(self.run_dir, "result_parsed.json"), "w") as f:
+        with open(os.path.join(self.run_dir, "result_parsed.yaml"), "w") as f:
             yaml.dump(result_json, f, sort_keys=False)
         # return table, result_group
 
     def execute(self, func, ci, config, **kwargs):
-        print("\n" + "=" * 80)
-        print(f"{xerrors.cur_time('human')} Runing: {ci}/{len(self.list)} {cp.magenta(config['tag'], bold=True)} {self.get_show_name(config)}")
-        print("=" * 80)
+        print("\n" + "=" * 118)
+        run_info = str(xerrors.cur_time('human'))
+        run_info += " " + f"Running: {ci}/{len(self.list)}"
+        run_info += " " + cp.magenta(config['tag'], bold=True)
+        run_info += " " + self.get_show_name(config)
+        print(run_info)
+        print("=" * 118)
         # print(config["tag"] + " Config:", end=" ")
         # cp.print_json(config)
 
@@ -253,7 +277,6 @@ class Runner(object):
                     print(config["tag"], f"{main_index}={result[main_index]} < {skip_value}")
                     print(f"The following config will be skipped: {', '.join(self.skip_name_list)}")
 
-
         except KeyboardInterrupt:
             cp.error(self.name, "KeyboardInterrupt: Interrupted by user!")
             status = "interrupted"
@@ -274,18 +297,18 @@ class Runner(object):
 
         return result, status
 
-
     def add(self, **configs):
         """ Add a new configuration to the runner """
-        combinations = self._parse_configuations(configs)
+        combinations = self._parse_configurations(configs)
         self.runner_list.extend(combinations)
 
     def add_test(self, **configs):
         """ Add a new configuration to the runner """
-        combinations = self._parse_configuations(configs)
+        combinations = self._parse_configurations(configs)
         self.test_list.extend(combinations)
 
-    def _parse_configuations(self, configs):
+    @staticmethod
+    def _parse_configurations(configs):
         """ Depth first search to parse all possible combinations of configurations"""
         if len(configs) == 0:
             return []
@@ -304,8 +327,9 @@ class Runner(object):
 
         return combinations
 
-    def _parse_index(self, index):
-        """ Parse the configuation index """
+    @staticmethod
+    def _parse_index(index):
+        """ Parse the configuration index """
         if isinstance(index, str):
             with open(index, "r") as f:
                 index = yaml.load(f, Loader=yaml.FullLoader)
@@ -339,7 +363,6 @@ class Runner(object):
 
         return self.global_gpu
 
-
     def generate_config_tag(self, config):
         """ Generate a tag for the configuration """
 
@@ -354,33 +377,18 @@ class Runner(object):
         tag = ""
         for key, value in config.items():
 
-            if key in self.block_configuation:
+            if key in self.block_configuration:
                 continue
 
             formatter = self.special_content.get(key, default_formatter)
-            tag += formatter(self.configuation_index.get(key, key), value)
+            tag += formatter(self.configuration_index.get(key, key), value)
 
         return tag
-
-    def runner_parser(self, extend_args=[]):
-        parser = argparse.ArgumentParser(add_help=False)
-        parser.add_argument("-Y", action="store_true", help="Confirm to run")
-        parser.add_argument("-T", "--test-mode", action="store_true", help="Run Test")
-        parser.add_argument("--gpu", type=str, default="not specified")
-        parser.add_argument("--output", type=str, default="output", help="Output directory")
-        parser.add_argument("--debug", action="store_true", help="Debug mode")
-
-        # if extend_args is not None and len(extend_args) > 0:
-        #     for arg in extend_args:
-        #         parser.add_argument(**arg)
-
-        args, _ = parser.parse_known_args()
-        return args
 
     def get_show_name(self, config):
         show_name = ""
         for k, v in config.items():
-            if k in self.special_content and k in self.block_configuation:
+            if k in self.special_content and k in self.block_configuration:
                 show_name += self.special_content[k](k, v)
         return show_name
 
@@ -392,6 +400,7 @@ def visible_length(text):
     # visible_text = ansi_escape.sub('', text)
     visible_text = re.sub(ansi_escape, '', text)
     return len(visible_text)
+
 
 def align_strings(input_list, split_str="|T|"):
     # 找到最长的可见字符串长度
