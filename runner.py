@@ -23,7 +23,7 @@ def runner_parser():
     parser.add_argument("-Y", action="store_true", help="Confirm to run")
     parser.add_argument("-T", "--test-mode", action="store_true", help="Run Test")
     parser.add_argument("--gpu", type=str, default="not specified")
-    parser.add_argument("--output", type=str, default="output", help="Output directory")
+    parser.add_argument("--output", type=str, default="/hdd/zwj/theta", help="Output directory")
     parser.add_argument("--debug", action="store_true", help="Debug mode")
     parser.add_argument("--offline", action="store_true", help="Wandb offline")
 
@@ -70,6 +70,7 @@ class Runner(object):
 
         # skip
         self.skip_name_list = []
+        self.success = False
 
     def run(self, func,
             gpu_id: str = "",
@@ -80,7 +81,6 @@ class Runner(object):
         gpu_id = gpu_id or self.modified_gpu()
         start_index = kwargs.get("start_index", 0)
         use_top_config = kwargs.get("use_top_config")
-
         if self.args.test_mode:
             self.list = self.test_list
         else:
@@ -108,9 +108,12 @@ class Runner(object):
 
             show_name = self.get_show_name(config)
 
-            prefix_tag = cp.green("▶") if ci == start_index else ci
-            tag_name = cp.green(config['tag'], bold=True) if ci == start_index else config['tag']
-            infos.append(f" {prefix_tag} {tag_name}|T|{show_name}")
+            if ci == start_index:
+                info = cp.green(f"▶ {ci} {config['tag']}|T|{show_name}", bold=True)
+            else:
+                info = cp.blue(f"  {ci} {config['tag']}|T|{show_name}", bold=True)
+
+            infos.append(info)
 
         print("\n".join(align_strings(infos)))
 
@@ -168,12 +171,19 @@ class Runner(object):
                 if start_index and ci < start_index:
                     continue
 
+            # 打印当前运行的配置以及结果
             if len(avg_result) > 0:
                 print()
+                pp_results_tuple = []
                 for k in avg_result.keys():
                     fmt_result = ", ".join([f"{r:.4f}" for r in avg_result[k]])
-                    ppname = cp.green(f"▶ {k}", True) if k == config['tag'] else cp.blue(f"  {k}")
-                    print(ppname, f"\t{mean(avg_result[k]):.4f} ({len(avg_result[k])}): {fmt_result}", )
+                    pp_name = cp.green(f"▶ {k}", True) if k == config['tag'] else cp.blue(f"  {k}")
+                    pp_result = f"\t{mean(avg_result[k]):.4f} ({len(avg_result[k])}): {fmt_result}"
+                    pp_results_tuple.append((pp_name, pp_result))
+
+                max_pp_name_len = max([len(t[0]) for t in pp_results_tuple])
+                for pp_name, pp_result in pp_results_tuple:
+                    print(pp_name.ljust(max_pp_name_len + 1, " "), pp_result)
 
                 # print(f"select {config['tag']} {', '.join([f'{r:.4f}' for r in avg_result[k]])}")
 
@@ -181,10 +191,11 @@ class Runner(object):
             config["status"] = status
 
             if status != "done":
+                cp.error(self.name, f"{config['tag']} {status}")
                 continue
 
-            print(self.run_id + " Result:", end=" ")
-            cp.print_json(result)
+            # print(self.run_id + " Result:", end=" ")
+            # cp.print_json(result)
             results.append(result)
 
             if use_top_config:
@@ -192,6 +203,7 @@ class Runner(object):
 
         self.results = results
         self._generate_results_table(results)
+        self.success = True
 
     def _generate_results_table(self, results):
         # handle results
@@ -246,8 +258,8 @@ class Runner(object):
 
     def execute(self, func, ci, config, **kwargs):
         print("\n" + "=" * 118)
-        run_info = str(xerrors.cur_time('human'))
-        run_info += " " + f"Running: {ci}/{len(self.list)}"
+        run_info = str(xerrors.cur_time("%m/%d %H:%M"))
+        run_info += " " + f"{ci}/{len(self.list)} {self.run_id}"
         run_info += " " + cp.magenta(config['tag'], bold=True)
         run_info += " " + self.get_show_name(config)
         print(run_info)
@@ -293,6 +305,7 @@ class Runner(object):
         except Exception as e:
             cp.error(self.name, traceback.format_exc())
             cp.error(self.name, f"Running Error: {e}, Continue...")
+            time.sleep(20)
             status = "error"
 
         return result, status
@@ -404,7 +417,8 @@ def visible_length(text):
 
 def align_strings(input_list, split_str="|T|"):
     # 找到最长的可见字符串长度
-    max_visible_length = max(visible_length(s.replace(split_str, '')) for s in input_list)
+    # max_visible_length = max(visible_length(s.replace(split_str, '')) for s in input_list)
+    max_visible_length = max(len(s) for s in input_list)
     # 对每个字符串进行处理，使其长度一样，并以|T|为分隔对齐
     aligned_list = []
     for s in input_list:

@@ -7,7 +7,8 @@ from xerrors.cprint import green, blue
 
 class Timer:
 
-    def __init__(self, localtime=time.localtime(), format_in=None):
+    def __init__(self, localtime=None, format_in=None):
+        localtime = localtime or time.localtime()
         self.time = localtime
         self.year = localtime.tm_year
         self.mon = localtime.tm_mon
