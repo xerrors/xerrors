@@ -126,10 +126,10 @@ class Runner(object):
             option = input(prompt)
 
             try:
-                option = float(option)
-                assert 0 <= option < 1, "Wrong option!"
-                kwargs["skip_value"] = option
-                print(f"Skip value set to {cp.yellow(option, True)}")
+                float_option = float(option)
+                assert 0 <= float_option < 1, "Wrong option!"
+                kwargs["skip_value"] = float_option
+                print(f"Skip value set to {cp.yellow(float_option, True)}")
             except (ValueError, AssertionError):
                 assert option in ["y", "Y", ""] + [str(i) for i in range(job_list_count)], "Canceled!"
                 if option in [str(i) for i in range(job_list_count)]:
@@ -142,34 +142,29 @@ class Runner(object):
             mean = lambda ll: sum(ll) / len(ll) if len(ll) > 0 else 0
             tag_num = len(set([c["tag"] for c in self.list]))
 
-            assert start_index == 0, "use_top_config and start_index cannot be used together"
+            # assert start_index == 0, "use_top_config and start_index cannot be used together"
             # assert job_list_count % tag_num == 0, "job_list_count % tag_num != 0"
 
         config = None
-        for ci in range(job_list_count):
-            if use_top_config:
-                if len(avg_result.keys()) == tag_num:
-                    config = None
-                    i = 0
-                    avg_sorted_tags = sorted(avg_result.keys(), key=lambda k: mean(avg_result[k]), reverse=True)
-                    while not config and i < len(avg_sorted_tags):
-                        for ccc in self.list:
-                            if not ccc.get("status") and ccc["tag"] == avg_sorted_tags[i]:
-                                config = ccc
-                                break
-                        i += 1
-                else:
-                    for cci in range(job_list_count):
-                        if not self.list[cci].get("status") and self.list[cci]["tag"] not in avg_result.keys():
-                            config = self.list[cci]
-                            break
+        for ci in range(start_index, job_list_count):
+            if use_top_config and len(avg_result.keys()) == tag_num:
+                avg_sorted_tags = sorted(avg_result.keys(), key=lambda k: mean(avg_result[k]), reverse=True)
+                for group in avg_sorted_tags:
+                    can_run = [c for c in self.list[start_index:] if not c.get("status") and c["tag"] == group]
+                    config = can_run[0] if can_run else None
+                    if config:
+                        break
 
-                assert config, "No config found!"
+            elif use_top_config:
+                for cci in range(start_index, job_list_count):
+                    if not self.list[cci].get("status") and self.list[cci]["tag"] not in avg_result.keys():
+                        config = self.list[cci]
+                        break
 
             else:
                 config = self.list[ci]
-                if start_index and ci < start_index:
-                    continue
+
+            assert config, "No config to run!"
 
             # 打印当前运行的配置以及结果
             if len(avg_result) > 0:
@@ -177,7 +172,7 @@ class Runner(object):
                 pp_results_tuple = []
                 for k in avg_result.keys():
                     fmt_result = ", ".join([f"{r:.4f}" for r in avg_result[k]])
-                    pp_name = cp.green(f"▶ {k}", True) if k == config['tag'] else cp.blue(f"  {k}")
+                    pp_name = cp.green(f"▶ {k}", True) if k == config['tag'] else cp.blue(f"  {k}", True)
                     pp_result = f"\t{mean(avg_result[k]):.4f} ({len(avg_result[k])}): {fmt_result}"
                     pp_results_tuple.append((pp_name, pp_result))
 
