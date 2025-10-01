@@ -2,8 +2,8 @@ PORT=8081
 GPU=0
 TENSOR_PARALLEL_SIZE=1
 
-source .venv/bin/activate
-source ./xerrors/.env
+# source .venv/bin/activate
+# source ./xerrors/.env
 
 MODEL_DIR=${MODEL_DIR:-/data/public/models}
 
@@ -37,7 +37,7 @@ export CUDA_VISIBLE_DEVICES="$GPU"
 if [ "$MODEL_NAME" = "llama3.1:8b" ]; then
     vllm serve "$MODEL_DIR/meta-llama/Meta-Llama-3.1-8B-Instruct" \
         --max_model_len 16384 \
-        --gpu-memory-utilization 0.8 \
+        --gpu-memory-utilization 0.7 \
         --served-model-name "$MODEL_NAME" \
         --host 0.0.0.0 --port $PORT
 fi
@@ -53,8 +53,8 @@ if [ "$MODEL_NAME" = "qwen3:32b" ]; then
 fi
 
 # Qwen/Qwen3-Embedding-0.6B
-if [ "$MODEL_NAME" = "Qwen3-Embedding-0.6B" ]; then
-    vllm serve "$MODEL_DIR/Qwen/Qwen3-Embedding-0.6B"  --task embed \
+if [ "$MODEL_NAME" = "Qwen3-Embedding-8B" ]; then
+    vllm serve "$MODEL_DIR/Qwen/Qwen3-Embedding-8B"  --task embed \
         --max_model_len 4096 \
         --dtype auto --tensor-parallel-size $TENSOR_PARALLEL_SIZE \
         --served-model-name "$MODEL_NAME" --host 0.0.0.0 --port $PORT \
@@ -62,6 +62,15 @@ if [ "$MODEL_NAME" = "Qwen3-Embedding-0.6B" ]; then
         --host 0.0.0.0 --port $PORT
 fi
 
+
+# vllm serve openai/gpt-oss-20b
+if [ "$MODEL_NAME" = "openai/gpt-oss-20b" ]; then
+    vllm serve "$MODEL_DIR/openai/gpt-oss-20b" \
+        --max_model_len 16384 \
+        --gpu-memory-utilization 0.9 \
+        --served-model-name "$MODEL_NAME" \
+        --host 0.0.0.0 --port $PORT
+fi
 
 
 
