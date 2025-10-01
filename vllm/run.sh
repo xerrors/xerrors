@@ -2,71 +2,62 @@ PORT=8081
 GPU=0
 TENSOR_PARALLEL_SIZE=1
 
-source .venv/bin/activate
-source ./xerrors/.env
-
 MODEL_DIR=${MODEL_DIR:-/data/public/models}
 
 while [[ $# -gt 0 ]]; do
-    case $1 in
-        --port)
-            PORT="$2"
-            shift 2
-            ;;
-        --gpu)
-            GPU="$2"
-            shift 2
-            ;;
-        *)
-            MODEL_NAME="$1"
-            shift
-            ;;
-    esac
+  case $1 in
+  --port)
+    PORT="$2"
+    shift 2
+    ;;
+  --gpu)
+    GPU="$2"
+    shift 2
+    ;;
+  *)
+    MODEL_NAME="$1"
+    shift
+    ;;
+  esac
 done
 
 if [ -z "$MODEL_NAME" ]; then
-    echo "Error: No model name provided."
-    echo "Usage: $0 [--port PORT] [--gpu GPU_ID] <model_name>"
-    echo "Available models: llama3.1:8b, qwen3:32b, Qwen3-Embedding-0.6B"
-    exit 1
+  echo "Error: No model name provided."
+  echo "Usage: $0 [--port PORT] [--gpu GPU_ID] <model_name>"
+  echo "Available models: llama3.1:8b, qwen3:32b, Qwen3-Embedding-0.6B"
+  exit 1
 fi
 
 export CUDA_VISIBLE_DEVICES="$GPU"
 
 # 使用llama3.1:8b 或者 llama3 或者 llama
 if [ "$MODEL_NAME" = "llama3.1:8b" ]; then
-    vllm serve "$MODEL_DIR/meta-llama/Meta-Llama-3.1-8B-Instruct" \
-        --max_model_len 16384 \
-        --gpu-memory-utilization 0.8 \
-        --served-model-name "$MODEL_NAME" \
-        --host 0.0.0.0 --port $PORT
+  vllm serve "$MODEL_DIR/meta-llama/Meta-Llama-3.1-8B-Instruct" \
+    --max_model_len 16384 \
+    --gpu-memory-utilization 0.8 \
+    --served-model-name "$MODEL_NAME" \
+    --host 0.0.0.0 --port $PORT
 fi
 
 if [ "$MODEL_NAME" = "qwen3:32b" ]; then
-    vllm serve "$MODEL_DIR/Qwen/Qwen3-32B" \
-        --dtype auto --tensor-parallel-size $TENSOR_PARALLEL_SIZE \
-        --max_model_len 16384 \
-        --served-model-name "$MODEL_NAME" \
-        --enable-auto-tool-choice \
-        --tool-call-parser hermes \
-        --host 0.0.0.0 --port $PORT
+  vllm serve "$MODEL_DIR/Qwen/Qwen3-32B" \
+    --dtype auto --tensor-parallel-size $TENSOR_PARALLEL_SIZE \
+    --max_model_len 16384 \
+    --served-model-name "$MODEL_NAME" \
+    --enable-auto-tool-choice \
+    --tool-call-parser hermes \
+    --host 0.0.0.0 --port $PORT
 fi
 
 # Qwen/Qwen3-Embedding-0.6B
-if [ "$MODEL_NAME" = "Qwen3-Embedding-0.6B" ]; then
-    vllm serve "$MODEL_DIR/Qwen/Qwen3-Embedding-0.6B"  --task embed \
-        --max_model_len 4096 \
-        --dtype auto --tensor-parallel-size $TENSOR_PARALLEL_SIZE \
-        --served-model-name "$MODEL_NAME" --host 0.0.0.0 --port $PORT \
-        --gpu-memory-utilization 0.1 \
-        --host 0.0.0.0 --port $PORT
+if [ "$MODEL_NAME" = "Qwen3-Embedding-8B" ]; then
+  vllm serve "$MODEL_DIR/Qwen/Qwen3-Embedding-8B" --task embed \
+    --max_model_len 4096 \
+    --dtype auto --tensor-parallel-size $TENSOR_PARALLEL_SIZE \
+    --served-model-name "$MODEL_NAME" --host 0.0.0.0 --port $PORT \
+    --gpu-memory-utilization 0.1 \
+    --host 0.0.0.0 --port $PORT
 fi
-
-
-
-
-
-
 
 # https://docs.vllm.ai/en/latest/serving/openai_compatible_server.html#named-arguments
 # model	模型路径，以文件夹结尾
