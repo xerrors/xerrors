@@ -1,6 +1,7 @@
 PORT=8081
 GPU=0
 TENSOR_PARALLEL_SIZE=1
+MEMORY=0.9
 
 # source .venv/bin/activate
 # source ./xerrors/.env
@@ -17,6 +18,10 @@ while [[ $# -gt 0 ]]; do
             GPU="$2"
             shift 2
             ;;
+        --memory)
+            MEMORY="$2"
+            shift 2
+            ;;
         *)
             MODEL_NAME="$1"
             shift
@@ -26,7 +31,7 @@ done
 
 if [ -z "$MODEL_NAME" ]; then
     echo "Error: No model name provided."
-    echo "Usage: $0 [--port PORT] [--gpu GPU_ID] <model_name>"
+    echo "Usage: $0 [--port PORT] [--gpu GPU_ID] [--memory MEMORY_UTIL] <model_name>"
     echo "Available models: llama3.1:8b, qwen3:32b, Qwen3-Embedding-0.6B"
     exit 1
 fi
@@ -37,7 +42,7 @@ export CUDA_VISIBLE_DEVICES="$GPU"
 if [ "$MODEL_NAME" = "llama3.1:8b" ]; then
     vllm serve "$MODEL_DIR/meta-llama/Meta-Llama-3.1-8B-Instruct" \
         --max_model_len 16384 \
-        --gpu-memory-utilization 0.7 \
+        --gpu-memory-utilization $MEMORY \
         --served-model-name "$MODEL_NAME" \
         --host 0.0.0.0 --port $PORT
 fi
@@ -46,6 +51,7 @@ if [ "$MODEL_NAME" = "qwen3:32b" ]; then
     vllm serve "$MODEL_DIR/Qwen/Qwen3-32B" \
         --dtype auto --tensor-parallel-size $TENSOR_PARALLEL_SIZE \
         --max_model_len 16384 \
+        --gpu-memory-utilization $MEMORY \
         --served-model-name "$MODEL_NAME" \
         --enable-auto-tool-choice \
         --tool-call-parser hermes \
@@ -58,16 +64,26 @@ if [ "$MODEL_NAME" = "Qwen3-Embedding-8B" ]; then
         --max_model_len 4096 \
         --dtype auto --tensor-parallel-size $TENSOR_PARALLEL_SIZE \
         --served-model-name "$MODEL_NAME" --host 0.0.0.0 --port $PORT \
-        --gpu-memory-utilization 0.1 \
+        --gpu-memory-utilization $MEMORY \
+        --host 0.0.0.0 --port $PORT
+fi
+
+# Qwen/Qwen3-Embedding-0.6B
+if [ "$MODEL_NAME" = "bge-m3" ]; then
+    vllm serve "$MODEL_DIR/BAAI/bge-m3"  --task embed \
+        --max_model_len 4096 \
+        --dtype auto --tensor-parallel-size $TENSOR_PARALLEL_SIZE \
+        --served-model-name "$MODEL_NAME" --host 0.0.0.0 --port $PORT \
+        --gpu-memory-utilization $MEMORY \
         --host 0.0.0.0 --port $PORT
 fi
 
 
 # vllm serve openai/gpt-oss-20b
-if [ "$MODEL_NAME" = "openai/gpt-oss-20b" ]; then
+if [ "$MODEL_NAME" = "gpt-oss-20b" ]; then
     vllm serve "$MODEL_DIR/openai/gpt-oss-20b" \
         --max_model_len 16384 \
-        --gpu-memory-utilization 0.9 \
+        --gpu-memory-utilization $MEMORY \
         --served-model-name "$MODEL_NAME" \
         --host 0.0.0.0 --port $PORT
 fi
