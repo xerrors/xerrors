@@ -39,7 +39,7 @@ export CUDA_VISIBLE_DEVICES="$GPU"
 if [ "$MODEL_NAME" = "llama3.1:8b" ]; then
   vllm serve "$MODEL_DIR/meta-llama/Meta-Llama-3.1-8B-Instruct" \
     --max_model_len 16384 \
-    --gpu-memory-utilization 0.8 \
+    --gpu-memory-utilization $MEMORY \
     --served-model-name "$MODEL_NAME" \
     --host 0.0.0.0 --port $PORT
 fi
@@ -54,7 +54,7 @@ if [ "$MODEL_NAME" = "qwen3:32b" ]; then
     --host 0.0.0.0 --port $PORT
 fi
 
-# Qwen/Qwen3-Embedding-0.6B
+# Qwen/Qwen3-Embedding-8B
 if [ "$MODEL_NAME" = "Qwen3-Embedding-8B" ]; then
   vllm serve "$MODEL_DIR/Qwen/Qwen3-Embedding-8B" --task embed \
     --max_model_len 4096 \
@@ -65,11 +65,20 @@ if [ "$MODEL_NAME" = "Qwen3-Embedding-8B" ]; then
 fi
 
 # Qwen/Qwen3-Embedding-0.6B
+if [ "$MODEL_NAME" = "Qwen3-Embedding-0.6B" ]; then
+  vllm serve "$MODEL_DIR/Qwen/Qwen3-Embedding-0.6B" --task embed \
+    --max_model_len 4096 \
+    --dtype auto --tensor-parallel-size $TENSOR_PARALLEL_SIZE \
+    --served-model-name "$MODEL_NAME" --host 0.0.0.0 --port $PORT \
+    --gpu-memory-utilization 0.1 \
+    --host 0.0.0.0 --port $PORT
+fi
+
 if [ "$MODEL_NAME" = "bge-m3" ]; then
   vllm serve "$MODEL_DIR/BAAI/bge-m3" --task embed \
     --max_model_len 4096 \
     --dtype auto --tensor-parallel-size $TENSOR_PARALLEL_SIZE \
-    --served-model-name "$MODEL_NAME" --host 0.0.0.0 --port $PORT \
+    --served-model-name "$MODEL_NAME" \
     --gpu-memory-utilization $MEMORY \
     --host 0.0.0.0 --port $PORT
 fi
