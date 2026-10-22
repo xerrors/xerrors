@@ -21,12 +21,6 @@
 📮 **联系邮箱：** [wenjie.zhang@stu.jiangnan.edu.cn](mailto:wenjie.zhang@stu.jiangnan.edu.cn)
 
 <p align="center">
-  <a href="https://github.com/xerrors/Yuxi">
-    <img src="https://xerrors.oss-cn-shanghai.aliyuncs.com/posts/2026/08/20260818-151118-mac-1787037059154-8c08f48c.png" alt="Yuxi：可私有部署的多租户知识智能体平台" width="100%" />
-  </a>
-</p>
-
-<p align="center">
   <a href="https://github.com/xerrors/Yuxi/stargazers"><img src="https://img.shields.io/github/stars/xerrors/Yuxi?style=flat-square&logo=github&label=Stars" alt="Yuxi Stars" /></a>
   <a href="https://github.com/xerrors/Yuxi/network/members"><img src="https://img.shields.io/github/forks/xerrors/Yuxi?style=flat-square&logo=github&label=Forks" alt="Yuxi Forks" /></a>
 </p>
