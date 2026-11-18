@@ -27,7 +27,7 @@
 
 我是 **[Yuxi](https://github.com/xerrors/Yuxi)** 的发起者与核心维护者，从 0 到 1 完成了整体架构和核心功能建设。Yuxi 是一个可私有部署的多租户知识智能体平台，将 RAG、知识图谱、多智能体、MCP/Skills、沙盒工具与权限管理整合在统一工作台中。
 
-项目目前拥有 **6.5k+ Stars** 和 **900+ Forks**，衍生版本已在多家企业实际使用。更多信息请访问：[项目主页](https://github.com/xerrors/Yuxi) · [在线文档](https://xerrors.github.io/Yuxi/) · [快速开始](https://xerrors.github.io/Yuxi/intro/quick-start)
+项目目前拥有 **7700+ Stars** 和 **1100+ Forks**，衍生版本已在多家企业实际使用。更多信息请访问：[项目主页](https://github.com/xerrors/Yuxi) · [在线文档](https://xerrors.github.io/Yuxi/) · [快速开始](https://xerrors.github.io/Yuxi/intro/quick-start)
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="./assets/contributions-dark.svg" />
